@@ -46,3 +46,9 @@ Thumbs.db
 # Build artifacts
 dist/
 build/
+
+# TLS certificates (test certificates should not be committed)
+certs/
+*.crt
+*.key
+*.pem

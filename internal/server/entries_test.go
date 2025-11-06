@@ -2,6 +2,7 @@ package server
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -11,6 +12,16 @@ import (
 
 	"github.com/artemaris/gophkeeper/internal/models"
 )
+
+// requestWithUserContext creates a request with user context set for testing
+func requestWithUserContext(r *http.Request, userID int, username string) *http.Request {
+	ctx := r.Context()
+	ctx = context.WithValue(ctx, UserIDKey, userID)
+	if username != "" {
+		ctx = context.WithValue(ctx, UsernameKey, username)
+	}
+	return r.WithContext(ctx)
+}
 
 // Test error
 var ErrUserNotFound = errors.New("user not found")
@@ -44,7 +55,7 @@ func TestCreateEntry(t *testing.T) {
 	body, _ := json.Marshal(req)
 	request := httptest.NewRequest(http.MethodPost, "/api/entries", bytes.NewBuffer(body))
 	request.Header.Set("Content-Type", "application/json")
-	request.Header.Set("X-User-ID", "1")
+	request = requestWithUserContext(request, 1, "testuser")
 	response := httptest.NewRecorder()
 
 	srv.createEntry(response, request, 1)
@@ -67,7 +78,7 @@ func TestListEntries(t *testing.T) {
 	srv := &Server{db: mockDB, router: http.NewServeMux()}
 
 	request := httptest.NewRequest(http.MethodGet, "/api/entries", nil)
-	request.Header.Set("X-User-ID", "1")
+	request = requestWithUserContext(request, 1, "testuser")
 	response := httptest.NewRecorder()
 
 	srv.listEntries(response, request, 1)
@@ -104,7 +115,7 @@ func TestGetEntry(t *testing.T) {
 	srv := &Server{db: mockDB, router: http.NewServeMux()}
 
 	request := httptest.NewRequest(http.MethodGet, "/api/entries/1", nil)
-	request.Header.Set("X-User-ID", "1")
+	request = requestWithUserContext(request, 1, "testuser")
 	response := httptest.NewRecorder()
 
 	srv.getEntry(response, request, 1, 1)
@@ -142,7 +153,7 @@ func TestUpdateEntry(t *testing.T) {
 	body, _ := json.Marshal(req)
 	request := httptest.NewRequest(http.MethodPut, "/api/entries/1", bytes.NewBuffer(body))
 	request.Header.Set("Content-Type", "application/json")
-	request.Header.Set("X-User-ID", "1")
+	request = requestWithUserContext(request, 1, "testuser")
 	response := httptest.NewRecorder()
 
 	srv.updateEntry(response, request, 1, 1)
@@ -162,7 +173,7 @@ func TestDeleteEntry(t *testing.T) {
 	srv := &Server{db: mockDB, router: http.NewServeMux()}
 
 	request := httptest.NewRequest(http.MethodDelete, "/api/entries/1", nil)
-	request.Header.Set("X-User-ID", "1")
+	request = requestWithUserContext(request, 1, "testuser")
 	response := httptest.NewRecorder()
 
 	srv.deleteEntry(response, request, 1, 1)
@@ -184,7 +195,7 @@ func TestSyncEntries(t *testing.T) {
 	srv := &Server{db: mockDB, router: http.NewServeMux()}
 
 	request := httptest.NewRequest(http.MethodGet, "/api/sync?since=1640995200", nil)
-	request.Header.Set("X-User-ID", "1")
+	request = requestWithUserContext(request, 1, "testuser")
 	response := httptest.NewRecorder()
 
 	srv.SyncHandler(response, request)
@@ -203,7 +214,7 @@ func TestCreateEntry_InvalidJSON(t *testing.T) {
 	body := bytes.NewReader([]byte(`{"type":"login",`)) // Invalid JSON
 	req := httptest.NewRequest("POST", "/api/entries", body)
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-User-ID", "1")
+	req = requestWithUserContext(req, 1, "testuser")
 	w := httptest.NewRecorder()
 
 	srv.EntriesHandler(w, req)
@@ -227,7 +238,7 @@ func TestCreateEntry_MissingFields(t *testing.T) {
 	body, _ := json.Marshal(req)
 	request := httptest.NewRequest(http.MethodPost, "/api/entries", bytes.NewBuffer(body))
 	request.Header.Set("Content-Type", "application/json")
-	request.Header.Set("X-User-ID", "1")
+	request = requestWithUserContext(request, 1, "testuser")
 	response := httptest.NewRecorder()
 
 	srv.createEntry(response, request, 1)
@@ -255,7 +266,7 @@ func TestCreateEntry_DatabaseError(t *testing.T) {
 	body, _ := json.Marshal(req)
 	request := httptest.NewRequest(http.MethodPost, "/api/entries", bytes.NewBuffer(body))
 	request.Header.Set("Content-Type", "application/json")
-	request.Header.Set("X-User-ID", "1")
+	request = requestWithUserContext(request, 1, "testuser")
 	response := httptest.NewRecorder()
 
 	srv.createEntry(response, request, 1)
@@ -272,7 +283,7 @@ func TestUpdateEntry_InvalidJSON(t *testing.T) {
 	body := bytes.NewReader([]byte(`{"title":"test",`)) // Invalid JSON
 	req := httptest.NewRequest("PUT", "/api/entries/1", body)
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-User-ID", "1")
+	req = requestWithUserContext(req, 1, "testuser")
 	w := httptest.NewRecorder()
 
 	srv.EntryHandler(w, req)
@@ -291,7 +302,7 @@ func TestGetEntry_NotFound(t *testing.T) {
 	srv := NewServer(mockDB)
 
 	request := httptest.NewRequest(http.MethodGet, "/api/entries/999", nil)
-	request.Header.Set("X-User-ID", "1")
+	request = requestWithUserContext(request, 1, "testuser")
 	response := httptest.NewRecorder()
 
 	srv.getEntry(response, request, 1, 999)
@@ -310,7 +321,7 @@ func TestDeleteEntry_NotFound(t *testing.T) {
 	srv := NewServer(mockDB)
 
 	request := httptest.NewRequest(http.MethodDelete, "/api/entries/999", nil)
-	request.Header.Set("X-User-ID", "1")
+	request = requestWithUserContext(request, 1, "testuser")
 	response := httptest.NewRecorder()
 
 	srv.deleteEntry(response, request, 1, 999)
@@ -329,7 +340,7 @@ func TestListEntries_DatabaseError(t *testing.T) {
 	srv := NewServer(mockDB)
 
 	request := httptest.NewRequest(http.MethodGet, "/api/entries", nil)
-	request.Header.Set("X-User-ID", "1")
+	request = requestWithUserContext(request, 1, "testuser")
 	response := httptest.NewRecorder()
 
 	srv.listEntries(response, request, 1)
@@ -348,7 +359,7 @@ func TestSyncEntries_DatabaseError(t *testing.T) {
 	srv := NewServer(mockDB)
 
 	request := httptest.NewRequest(http.MethodGet, "/api/sync?since=1640995200", nil)
-	request.Header.Set("X-User-ID", "1")
+	request = requestWithUserContext(request, 1, "testuser")
 	response := httptest.NewRecorder()
 
 	srv.SyncHandler(response, request)
@@ -363,7 +374,7 @@ func TestEntryHandler_InvalidEntryID(t *testing.T) {
 	srv := NewServer(mockDB)
 
 	req := httptest.NewRequest("GET", "/api/entries/invalid", nil)
-	req.Header.Set("X-User-ID", "1")
+	req = requestWithUserContext(req, 1, "testuser")
 	w := httptest.NewRecorder()
 
 	srv.EntryHandler(w, req)
@@ -378,7 +389,7 @@ func TestEntriesHandler_MethodNotAllowed(t *testing.T) {
 	srv := NewServer(mockDB)
 
 	req := httptest.NewRequest("PUT", "/api/entries", nil)
-	req.Header.Set("X-User-ID", "1")
+	req = requestWithUserContext(req, 1, "testuser")
 	w := httptest.NewRecorder()
 
 	srv.EntriesHandler(w, req)

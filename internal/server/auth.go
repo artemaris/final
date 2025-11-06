@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"crypto/rand"
 	"fmt"
 	"net/http"
@@ -11,6 +12,16 @@ import (
 	"github.com/artemaris/gophkeeper/internal/crypto"
 	"github.com/artemaris/gophkeeper/internal/models"
 	"github.com/golang-jwt/jwt/v5"
+)
+
+// contextKey is a type for context keys to avoid collisions
+type contextKey string
+
+const (
+	// UserIDKey is the context key for user ID
+	UserIDKey contextKey = "userID"
+	// UsernameKey is the context key for username
+	UsernameKey contextKey = "username"
 )
 
 // Claims represents JWT claims
@@ -161,9 +172,13 @@ func (s *Server) AuthMiddleware(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 
-		// Add user info to context
-		r.Header.Set("X-User-ID", fmt.Sprintf("%d", claims.UserID))
-		r.Header.Set("X-Username", claims.Username)
+		// Add user info to context using typed keys
+		ctx := r.Context()
+		ctx = context.WithValue(ctx, UserIDKey, claims.UserID)
+		ctx = context.WithValue(ctx, UsernameKey, claims.Username)
+
+		// Create new request with updated context
+		r = r.WithContext(ctx)
 
 		next(w, r)
 	}

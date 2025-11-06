@@ -2,6 +2,7 @@ package server
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -80,7 +81,8 @@ func TestRespondError(t *testing.T) {
 
 func TestGetUserID(t *testing.T) {
 	r := httptest.NewRequest(http.MethodGet, "/test", nil)
-	r.Header.Set("X-User-ID", "42")
+	ctx := context.WithValue(r.Context(), UserIDKey, 42)
+	r = r.WithContext(ctx)
 
 	userID, err := getUserID(r)
 	if err != nil {
@@ -97,7 +99,31 @@ func TestGetUserID_Missing(t *testing.T) {
 
 	_, err := getUserID(r)
 	if err == nil {
-		t.Error("Expected error when X-User-ID header is missing")
+		t.Error("Expected error when user ID is missing from context")
+	}
+}
+
+func TestGetUserName(t *testing.T) {
+	r := httptest.NewRequest(http.MethodGet, "/test", nil)
+	ctx := context.WithValue(r.Context(), UsernameKey, "testuser")
+	r = r.WithContext(ctx)
+
+	username, err := getUserName(r)
+	if err != nil {
+		t.Fatalf("Failed to get username: %v", err)
+	}
+
+	if username != "testuser" {
+		t.Errorf("Expected username 'testuser', got '%s'", username)
+	}
+}
+
+func TestGetUserName_Missing(t *testing.T) {
+	r := httptest.NewRequest(http.MethodGet, "/test", nil)
+
+	_, err := getUserName(r)
+	if err == nil {
+		t.Error("Expected error when username is missing from context")
 	}
 }
 

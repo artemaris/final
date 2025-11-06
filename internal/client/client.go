@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
+	"strconv"
 	"time"
 
 	"github.com/artemaris/gophkeeper/internal/models"
@@ -19,13 +21,43 @@ type Client struct {
 }
 
 // NewClient creates a new GophKeeper client
+// If timeout is 0, it will be read from CLIENT_TIMEOUT environment variable
+// or default to 30 seconds if the environment variable is not set
 func NewClient(baseURL string) *Client {
+	return NewClientWithTimeout(baseURL, 0)
+}
+
+// NewClientWithTimeout creates a new GophKeeper client with a custom timeout
+// If timeout is 0, it will be read from CLIENT_TIMEOUT environment variable
+// or default to 30 seconds if the environment variable is not set
+func NewClientWithTimeout(baseURL string, timeout time.Duration) *Client {
+	if timeout == 0 {
+		timeout = getTimeoutFromEnv()
+	}
+
 	return &Client{
 		baseURL: baseURL,
 		client: &http.Client{
-			Timeout: 30 * time.Second,
+			Timeout: timeout,
 		},
 	}
+}
+
+// getTimeoutFromEnv reads the timeout from CLIENT_TIMEOUT environment variable
+// Returns default timeout (30 seconds) if the variable is not set or invalid
+func getTimeoutFromEnv() time.Duration {
+	timeoutStr := os.Getenv("CLIENT_TIMEOUT")
+	if timeoutStr == "" {
+		return 30 * time.Second
+	}
+
+	timeoutSeconds, err := strconv.Atoi(timeoutStr)
+	if err != nil || timeoutSeconds <= 0 {
+		// Invalid value, return default
+		return 30 * time.Second
+	}
+
+	return time.Duration(timeoutSeconds) * time.Second
 }
 
 // SetToken sets the authentication token

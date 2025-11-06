@@ -2,11 +2,18 @@ package storage
 
 import (
 	"database/sql"
+	"embed"
 	"fmt"
 	"os"
 
+	"github.com/golang-migrate/migrate/v4"
+	"github.com/golang-migrate/migrate/v4/database/postgres"
+	"github.com/golang-migrate/migrate/v4/source/iofs"
 	_ "github.com/lib/pq"
 )
+
+//go:embed migrations/*.sql
+var migrationsFS embed.FS
 
 // DB wraps a database connection
 type DB struct {
@@ -37,37 +44,34 @@ func (db *DB) Close() error {
 	return db.conn.Close()
 }
 
-// migrate runs database migrations
+// migrate runs database migrations using golang-migrate
 func (db *DB) migrate() error {
-	migrations := []string{
-		// Users table
-		`CREATE TABLE IF NOT EXISTS users (
-			id SERIAL PRIMARY KEY,
-			username VARCHAR(255) UNIQUE NOT NULL,
-			password VARCHAR(255) NOT NULL,
-			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-		)`,
-		// Entries table
-		`CREATE TABLE IF NOT EXISTS entries (
-			id SERIAL PRIMARY KEY,
-			user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-			type VARCHAR(50) NOT NULL,
-			title VARCHAR(255) NOT NULL,
-			data TEXT NOT NULL,
-			metadata TEXT,
-			version INTEGER DEFAULT 1,
-			updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-		)`,
-		// Indexes
-		`CREATE INDEX IF NOT EXISTS idx_entries_user_id ON entries(user_id)`,
-		`CREATE INDEX IF NOT EXISTS idx_entries_updated_at ON entries(updated_at)`,
+	// Create database driver instance
+	driver, err := postgres.WithInstance(db.conn, &postgres.Config{})
+	if err != nil {
+		return fmt.Errorf("failed to create postgres driver: %w", err)
 	}
 
-	for _, migration := range migrations {
-		if _, err := db.conn.Exec(migration); err != nil {
-			return fmt.Errorf("migration failed: %w", err)
-		}
+	// Create source driver from embedded filesystem
+	sourceDriver, err := iofs.New(migrationsFS, "migrations")
+	if err != nil {
+		return fmt.Errorf("failed to create migration source: %w", err)
+	}
+
+	// Create migrate instance
+	m, err := migrate.NewWithInstance(
+		"iofs",
+		sourceDriver,
+		"postgres",
+		driver,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to create migrate instance: %w", err)
+	}
+
+	// Run migrations
+	if err := m.Up(); err != nil && err != migrate.ErrNoChange {
+		return fmt.Errorf("failed to run migrations: %w", err)
 	}
 
 	return nil

@@ -17,6 +17,10 @@ const (
 	saltLength = 16
 	nonceLength = 12
 	keyLength = 32
+	// pbkdf2Iterations is the number of iterations for PBKDF2 key derivation
+	// OWASP recommends at least 600,000 iterations for password storage
+	// See: https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html#pbkdf2
+	pbkdf2Iterations = 600_000
 )
 
 // Encrypt encrypts plaintext using AES-256-GCM with the given password
@@ -27,8 +31,8 @@ func Encrypt(plaintext, password string) (string, error) {
 		return "", err
 	}
 
-	// Derive key from password
-	key := pbkdf2.Key([]byte(password), salt, 4096, keyLength, sha256.New)
+	// Derive key from password using PBKDF2 with OWASP-recommended iterations
+	key := pbkdf2.Key([]byte(password), salt, pbkdf2Iterations, keyLength, sha256.New)
 
 	// Create cipher
 	block, err := aes.NewCipher(key)
@@ -74,8 +78,8 @@ func Decrypt(ciphertext, password string) (string, error) {
 	salt := data[:saltLength]
 	encrypted := data[saltLength:]
 
-	// Derive key from password
-	key := pbkdf2.Key([]byte(password), salt, 4096, keyLength, sha256.New)
+	// Derive key from password using PBKDF2 with OWASP-recommended iterations
+	key := pbkdf2.Key([]byte(password), salt, pbkdf2Iterations, keyLength, sha256.New)
 
 	// Create cipher
 	block, err := aes.NewCipher(key)

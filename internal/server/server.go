@@ -64,12 +64,24 @@ func respondError(w http.ResponseWriter, status int, message string) {
 	json.NewEncoder(w).Encode(map[string]string{"error": message})
 }
 
+// getUserID retrieves the user ID from the request context
 func getUserID(r *http.Request) (int, error) {
-	userIDStr := r.Header.Get("X-User-ID")
-	if userIDStr == "" {
-		return 0, fmt.Errorf("user ID not found in request")
+	ctx := r.Context()
+	userID, ok := ctx.Value(UserIDKey).(int)
+	if !ok || userID == 0 {
+		return 0, fmt.Errorf("user ID not found in context")
 	}
-	return strconv.Atoi(userIDStr)
+	return userID, nil
+}
+
+// getUserName retrieves the username from the request context
+func getUserName(r *http.Request) (string, error) {
+	ctx := r.Context()
+	username, ok := ctx.Value(UsernameKey).(string)
+	if !ok || username == "" {
+		return "", fmt.Errorf("username not found in context")
+	}
+	return username, nil
 }
 
 func parseEntryID(path string) (int, error) {
